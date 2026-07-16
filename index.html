@@ -1166,7 +1166,8 @@
                 return item;
             });
 
-            const descricao = `Lavagem concluída - ${bancoDeAgendamentos.find(function(item) { return item.id === agendamentoParaFinalizarId; }).nome} (${bancoDeAgendamentos.find(function(item) { return item.id === agendamentoParaFinalizarId; }).moto})${adicionais.length > 0 ? ` | adicionais: ${adicionais.map(function(item) { return item.nome; }).join(', ')}` : ''}`;
+            const agendamentoFinalizado = bancoDeAgendamentos.find(function(item) { return item.id === agendamentoParaFinalizarId; });
+            const descricao = `Lavagem concluída - ${agendamentoFinalizado.nome} (${agendamentoFinalizado.moto}) | valor: R$ ${valorTotal.toFixed(2).replace('.', ',')}${adicionais.length > 0 ? ` | adicionais: ${adicionais.map(function(item) { return `${item.nome} (R$ ${item.valor.toFixed(2).replace('.', ',')})`; }).join(', ')}` : ''}`;
             bancoDeCaixa.push({
                 id: Date.now().toString() + Math.random().toString(16).slice(2),
                 data: new Date().toLocaleDateString('pt-BR'),
