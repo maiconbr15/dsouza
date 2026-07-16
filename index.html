@@ -435,21 +435,36 @@
 
         @media (max-width: 900px) {
             body { flex-direction: column; }
-            .sidebar { width: 100%; min-height: auto; }
+            .app-shell { flex-direction: column; }
+            .sidebar { width: 100%; min-height: auto; padding: 16px; }
+            .nav-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+            .nav-links li { margin-bottom: 0; }
+            .nav-links a { justify-content: center; text-align: center; padding: 10px 8px; font-size: 13px; }
+            .nav-links a i { margin-right: 6px; }
+            .user-info { flex-direction: column; align-items: flex-start; gap: 6px; }
             .main-content { padding: 20px; }
             .hero-panel { flex-direction: column; align-items: flex-start; }
             .hero-badges { width: 100%; }
+            .modal-content { padding: 20px; }
         }
 
         @media (max-width: 640px) {
-            .main-content { padding: 16px; }
-            header { flex-direction: column; align-items: flex-start; }
-            .quick-actions { width: 100%; }
-            .quick-actions button { flex: 1; justify-content: center; }
-            .cards-grid { grid-template-columns: 1fr; }
+            .main-content { padding: 14px; }
+            header { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .quick-actions { width: 100%; flex-direction: column; }
+            .quick-actions button { width: 100%; justify-content: center; }
+            .cards-grid { grid-template-columns: 1fr; gap: 14px; }
             .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-            table { font-size: 13px; }
+            .recent-section { padding: 16px; }
+            .history-day-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+            table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; font-size: 13px; }
+            .calendar-grid { gap: 6px; }
+            .calendar-day { min-height: 70px; padding: 8px; }
+            .calendar-number { font-size: 13px; }
+            .calendar-dot { font-size: 11px; }
             .form-row { flex-direction: column; gap: 0; }
+            .login-card { padding: 22px; }
+            .modal-content { padding: 18px; max-height: 90vh; overflow-y: auto; }
         }
     </style>
 </head>
