@@ -432,6 +432,29 @@
             transition: transform 0.2s ease;
         }
         .btn-apagar-linha:hover { color: #c0392b; transform: scale(1.15); }
+        .checkbox-group { display: grid; gap: 8px; margin-top: 8px; }
+        .checkbox-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #fbfdff;
+        }
+        .checkbox-item label { display: flex; align-items: center; gap: 8px; margin-bottom: 0; }
+        .checkbox-item small { color: #6b7280; font-size: 12px; }
+        .textarea-observacoes {
+            width: 100%;
+            min-height: 90px;
+            resize: vertical;
+            padding: 12px 13px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: #fbfdff;
+        }
+        .obs-mini { font-size: 12px; color: #6b7280; margin-top: 4px; }
 
         @media (max-width: 900px) {
             body { flex-direction: column; }
@@ -658,6 +681,10 @@
                         <option value="Vitrificação">Vitrificação de Pintura</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Observações / Desejos do cliente</label>
+                    <textarea id="observacoesCliente" class="textarea-observacoes" placeholder="Ex: deseja cera protetora, acabamento especial, etc."></textarea>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Data</label>
@@ -690,6 +717,39 @@
                 <div class="form-group"><label>Descrição</label><input type="text" id="descCaixa" placeholder="Ex: Lavagem - CB 500" required></div>
                 <div class="form-group"><label>Valor (R$)</label><input type="number" id="valorCaixa" placeholder="0.00" step="0.01" required></div>
                 <button type="button" class="btn-salvar btn-verde" onclick="salvarCaixa()">Registrar Valor</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalFinalizarServico" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Finalizar lavagem</h2>
+                <button class="close-btn" onclick="fecharModal('modalFinalizarServico')">&times;</button>
+            </div>
+            <form>
+                <div class="form-group">
+                    <label>Valor da lavagem</label>
+                    <input type="number" id="valorFinalizacao" placeholder="0.00" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Adicionais</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <label><input type="checkbox" value="5" data-nome="Revitalização de plástico"> Revitalização de plástico</label>
+                            <small>R$ 5,00</small>
+                        </div>
+                        <div class="checkbox-item">
+                            <label><input type="checkbox" value="10" data-nome="Cera protetora"> Cera protetora</label>
+                            <small>R$ 10,00</small>
+                        </div>
+                        <div class="checkbox-item">
+                            <label><input type="checkbox" value="10" data-nome="Revitalização de escapamento"> Revitalização de escapamento</label>
+                            <small>R$ 10,00</small>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-salvar btn-verde" onclick="salvarFinalizacaoAgendamento()">Registrar conclusão</button>
             </form>
         </div>
     </div>
@@ -788,6 +848,7 @@
         let bancoDeCaixa = [];
         let dbFirebase = null;
         let useFirebase = false;
+        let agendamentoParaFinalizarId = null;
         const DB_NAME = 'dsouzaDB';
         const DB_VERSION = 1;
         const firebaseConfig = {
@@ -975,7 +1036,8 @@
                 dataInvertida: dataFormatoNativo,
                 dataTela: dataBonita,
                 hora: hora,
-                status: 'pendente'
+                status: 'pendente',
+                observacoes: document.getElementById('observacoesCliente').value.trim()
             };
 
             bancoDeAgendamentos.push(novoAgendamento);
@@ -990,6 +1052,7 @@
             document.getElementById('motoCliente').value = '';
             document.getElementById('dataCliente').value = '';
             document.getElementById('horaCliente').value = '';
+            document.getElementById('observacoesCliente').value = '';
 
             fecharModal('modalAgendamento');
             atualizarTelaAgendamentos();
@@ -1022,12 +1085,13 @@
                     ? `<td><button class="btn-apagar-linha" onclick="concluirAgendamento('${item.id}')" title="Finalizar serviço"><i class="fas fa-check-circle"></i> Finalizar</button> <button class="btn-apagar-linha" onclick="cancelarAgendamentoEspecífico('${item.id}')" title="Cancelar Serviço"><i class="fas fa-times-circle"></i></button></td>`
                     : '<td>-</td>';
 
+                const observacoesHtml = item.observacoes ? `<div class="obs-mini">Obs: ${item.observacoes}</div>` : '';
                 let linha = `
                     <tr>
                         <td><strong>${item.dataTela}</strong> às <strong>${item.hora}</strong></td>
                         <td>${item.nome}</td>
                         <td>${item.moto}</td>
-                        <td><span class="status status-servico">${item.servico}</span></td>
+                        <td><span class="status status-servico">${item.servico}</span>${observacoesHtml}</td>
                         ${colunaAcao}
                     </tr>
                 `;
@@ -1056,17 +1120,68 @@
             }
         }
 
-        async function concluirAgendamento(id) {
-            if (confirm('Marcar este serviço como concluído?')) {
-                bancoDeAgendamentos = bancoDeAgendamentos.map(function(item) {
-                    if (item.id === id) {
-                        return { ...item, status: 'concluido' };
-                    }
-                    return item;
-                });
-                await persistirAgendamentos();
-                atualizarTelaAgendamentos();
+        async function persistirCaixa() {
+            localStorage.setItem('dsouzaCaixa', JSON.stringify(bancoDeCaixa));
+            if (useFirebase) {
+                await salvarCaixaNoFirebase();
+            } else {
+                await limparStoreNoBanco('caixa');
+                for (const item of bancoDeCaixa) {
+                    await salvarItemNoBanco('caixa', item);
+                }
             }
+        }
+
+        function concluirAgendamento(id) {
+            agendamentoParaFinalizarId = id;
+            document.getElementById('valorFinalizacao').value = '';
+            document.querySelectorAll('#modalFinalizarServico input[type="checkbox"]').forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            abrirModal('modalFinalizarServico');
+        }
+
+        async function salvarFinalizacaoAgendamento() {
+            if (!agendamentoParaFinalizarId) return;
+
+            const valorBase = parseFloat(document.getElementById('valorFinalizacao').value || '0');
+            const adicionais = Array.from(document.querySelectorAll('#modalFinalizarServico input[type="checkbox"]:checked')).map(function(checkbox) {
+                return {
+                    nome: checkbox.dataset.nome,
+                    valor: parseFloat(checkbox.value || '0')
+                };
+            });
+            const valorTotal = valorBase + adicionais.reduce(function(total, item) { return total + item.valor; }, 0);
+
+            bancoDeAgendamentos = bancoDeAgendamentos.map(function(item) {
+                if (item.id === agendamentoParaFinalizarId) {
+                    return {
+                        ...item,
+                        status: 'concluido',
+                        valorFinal: valorTotal,
+                        adicionais: adicionais,
+                        dataConclusao: obterDataLocal()
+                    };
+                }
+                return item;
+            });
+
+            const descricao = `Lavagem concluída - ${bancoDeAgendamentos.find(function(item) { return item.id === agendamentoParaFinalizarId; }).nome} (${bancoDeAgendamentos.find(function(item) { return item.id === agendamentoParaFinalizarId; }).moto})${adicionais.length > 0 ? ` | adicionais: ${adicionais.map(function(item) { return item.nome; }).join(', ')}` : ''}`;
+            bancoDeCaixa.push({
+                id: Date.now().toString() + Math.random().toString(16).slice(2),
+                data: new Date().toLocaleDateString('pt-BR'),
+                tipo: 'entrada',
+                descricao: descricao,
+                valor: valorTotal
+            });
+
+            await persistirAgendamentos();
+            await persistirCaixa();
+
+            fecharModal('modalFinalizarServico');
+            agendamentoParaFinalizarId = null;
+            atualizarTelaAgendamentos();
+            atualizarTelaCaixa();
         }
 
         async function cancelarAgendamentoEspecífico(id) {
@@ -1116,12 +1231,7 @@
                 valor: valor
             };
             bancoDeCaixa.push(novoRegistro);
-            localStorage.setItem('dsouzaCaixa', JSON.stringify(bancoDeCaixa));
-            if (useFirebase) {
-                await salvarCaixaNoFirebase();
-            } else {
-                await salvarItemNoBanco('caixa', novoRegistro);
-            }
+            await persistirCaixa();
 
             document.getElementById('descCaixa').value = '';
             document.getElementById('valorCaixa').value = '';
