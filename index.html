@@ -213,6 +213,34 @@
             gap: 8px;
         }
 
+        /* SELETOR DE MÊS DOS CARDS DO TOPO */
+        .filter-header-cards {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .filter-header-cards label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .select-mes-cards {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            outline: none;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            cursor: pointer;
+        }
+
         .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .card {
             background: linear-gradient(145deg, var(--card-bg) 0%, #f8fbff 100%);
@@ -614,10 +642,18 @@
                 <div class="status-bar" id="statusDiario"><i class="fas fa-database"></i> <span id="textoStatusDiario">Conectando...</span></div>
             </section>
 
+            <!-- SELETOR DE MÊS PARA OS CARDS DO TOPO -->
+            <div class="filter-header-cards">
+                <label for="selectMesCards"><i class="fas fa-filter"></i> Filtrar Período:</label>
+                <select id="selectMesCards" class="select-mes-cards" onchange="atualizarTelaCaixa()">
+                    <!-- Preenchido dinamicamente via JS -->
+                </select>
+            </div>
+
             <section class="cards-grid">
                 <div class="card">
                     <div class="card-icon icon-balanco"><i class="fas fa-scale-balanced"></i></div>
-                    <div class="card-info"><h3>Balanço Atual</h3><p id="valorBalanco">R$ 0,00</p></div>
+                    <div class="card-info"><h3>Balanço do Período</h3><p id="valorBalanco">R$ 0,00</p></div>
                 </div>
                 <div class="card">
                     <div class="card-icon icon-receita"><i class="fas fa-arrow-trend-up"></i></div>
@@ -1047,6 +1083,54 @@
             await dbFirebase.ref('dsouza/caixa').set(bancoDeCaixa);
         }
 
+        function popularSeletorMeses() {
+            const select = document.getElementById('selectMesCards');
+            if (!select) return;
+
+            const valorAnterior = select.value;
+            select.innerHTML = '';
+
+            const hoje = new Date();
+            const mesAtualChave = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+
+            // Coleta todos os meses que possuem dados no caixa
+            const mesesSet = new Set();
+            mesesSet.add(mesAtualChave); // Sempre garante o mês atual
+
+            bancoDeCaixa.forEach(item => {
+                const chave = obterChaveData(item.data);
+                if (chave.length >= 7) {
+                    mesesSet.add(chave.substring(0, 7));
+                }
+            });
+
+            // Ordena os meses do mais recente para o mais antigo
+            const mesesOrdenados = Array.from(mesesSet).sort().reverse();
+
+            mesesOrdenados.forEach(mesChave => {
+                const [ano, mes] = mesChave.split('-');
+                const dataObj = new Date(parseInt(ano), parseInt(mes) - 1, 1);
+                let nomeMes = dataObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                nomeMes = nomeMes.replace(/^./, l => l.toUpperCase());
+
+                if (mesChave === mesAtualChave) {
+                    nomeMes += ' (Mês Atual)';
+                }
+
+                const option = document.createElement('option');
+                option.value = mesChave;
+                option.innerText = nomeMes;
+                select.appendChild(option);
+            });
+
+            // Restaura o valor selecionado se ainda for válido, senão usa o mês atual
+            if (valorAnterior && Array.from(select.options).some(o => o.value === valorAnterior)) {
+                select.value = valorAnterior;
+            } else {
+                select.value = mesAtualChave;
+            }
+        }
+
         async function carregarDadosIniciais() {
             useFirebase = inicializarFirebase();
 
@@ -1086,6 +1170,7 @@
                 }
             }
 
+            popularSeletorMeses();
             atualizarTelaAgendamentos();
             atualizarTelaCaixa();
             renderizarCalendario();
@@ -1265,6 +1350,7 @@
 
             fecharModal('modalFinalizarServico');
             agendamentoParaFinalizarId = null;
+            popularSeletorMeses();
             atualizarTelaAgendamentos();
             atualizarTelaCaixa();
         }
@@ -1309,6 +1395,7 @@
             document.getElementById('valorCaixa').value = '';
 
             fecharModal('modalCaixa');
+            popularSeletorMeses();
             atualizarTelaCaixa();
         }
 
@@ -1318,6 +1405,7 @@
                     return item.id !== id;
                 });
                 await persistirCaixa();
+                popularSeletorMeses();
                 atualizarTelaCaixa();
             }
         }
@@ -1337,12 +1425,15 @@
             let corpoTabelaDetalhada = document.getElementById('tabelaCaixaDetalhada');
             let containerBtn = document.getElementById('containerBtnVerMais');
             let btnVerMais = document.getElementById('btnVerMaisCaixa');
+            let selectMes = document.getElementById('selectMesCards');
             
             corpoTabela.innerHTML = '';
             corpoTabelaDetalhada.innerHTML = '';
 
-            let totalEntradas = 0;
-            let totalSaidas = 0;
+            let totalEntradasFiltradas = 0;
+            let totalSaidasFiltradas = 0;
+
+            const mesSelecionadoChave = selectMes ? selectMes.value : obterDataLocal().substring(0, 7);
 
             if (bancoDeCaixa.length === 0) {
                 corpoTabela.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#7f8c8d;">Nenhuma movimentação registrada.</td></tr>';
@@ -1355,7 +1446,7 @@
             // Lógica para limitar a 2 itens no Dashboard se não estiver expandido
             const listaDashboard = expandirCaixaDashboard ? listaInvertida : listaInvertida.slice(0, 2);
 
-            // Atualiza a tabela resumida do Dashboard (com limite de 2 itens)
+            // Atualiza a tabela resumida do Dashboard
             listaDashboard.forEach(function(item) {
                 let icone = item.tipo === 'entrada'
                     ? '<i class="fas fa-arrow-up" style="color:#2ecc71"></i> Entrada'
@@ -1378,9 +1469,19 @@
                 corpoTabela.innerHTML += linha;
             });
 
-            // Atualiza a tabela completa da aba Fluxo de Caixa (mostra tudo)
+            // Atualiza a tabela completa e calcula APENAS O MÊS SELECIONADO para os cards do topo
             listaInvertida.forEach(function(item) {
-                if (item.tipo === 'entrada') { totalEntradas += item.valor; } else { totalSaidas += item.valor; }
+                const chaveItem = obterChaveData(item.data);
+                
+                // Soma nos totais se o lançamento for do MÊS SELECIONADO
+                if (chaveItem.startsWith(mesSelecionadoChave)) {
+                    if (item.tipo === 'entrada') { 
+                        totalEntradasFiltradas += item.valor; 
+                    } else { 
+                        totalSaidasFiltradas += item.valor; 
+                    }
+                }
+
                 let icone = item.tipo === 'entrada'
                     ? '<i class="fas fa-arrow-up" style="color:#2ecc71"></i> Entrada'
                     : '<i class="fas fa-arrow-down" style="color:#e74c3c"></i> Saída';
@@ -1416,11 +1517,13 @@
                 }
             }
 
-            let balancoReal = totalEntradas - totalSaidas;
-            document.getElementById('valorEntradas').innerText = totalEntradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            document.getElementById('valorSaidas').innerText = totalSaidas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            document.getElementById('valorBalanco').innerText = balancoReal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            if (balancoReal < 0) {
+            // Atualiza os Cards do topo com os valores do MÊS SELECIONADO
+            let balancoRealFiltrado = totalEntradasFiltradas - totalSaidasFiltradas;
+            document.getElementById('valorEntradas').innerText = totalEntradasFiltradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('valorSaidas').innerText = totalSaidasFiltradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('valorBalanco').innerText = balancoRealFiltrado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            
+            if (balancoRealFiltrado < 0) {
                 document.getElementById('valorBalanco').style.color = '#e74c3c';
             } else {
                 document.getElementById('valorBalanco').style.color = 'var(--text-main)';
