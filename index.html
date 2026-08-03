@@ -432,6 +432,32 @@
             gap: 6px;
         }
         .btn-apagar-linha:hover { background: #fee2e2; }
+
+        /* BOTÃO VER MAIS / VER MENOS */
+        .btn-ver-mais-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 14px;
+        }
+        .btn-ver-mais {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        .btn-ver-mais:hover {
+            background: #eef2f7;
+            transform: translateY(-1px);
+        }
         
         .checkbox-group { display: grid; gap: 8px; margin-top: 8px; }
         .checkbox-item {
@@ -629,6 +655,11 @@
                     </thead>
                     <tbody id="tabelaCaixa"></tbody>
                 </table>
+                <div class="btn-ver-mais-container" id="containerBtnVerMais">
+                    <button class="btn-ver-mais" id="btnVerMaisCaixa" onclick="alternarVerMaisCaixa()">
+                        <i class="fas fa-chevron-down"></i> Ver mais
+                    </button>
+                </div>
             </section>
 
             <section class="recent-section">
@@ -652,6 +683,11 @@
                     <h2>Histórico por dia</h2>
                 </div>
                 <div id="historicoDiario" class="history-list"></div>
+                <div class="btn-ver-mais-container" id="containerBtnVerMaisHistorico">
+                    <button class="btn-ver-mais" id="btnVerMaisHistorico" onclick="alternarVerMaisHistorico()">
+                        <i class="fas fa-chevron-down"></i> Ver mais
+                    </button>
+                </div>
             </section>
 
             <section class="recent-section">
@@ -809,6 +845,8 @@
 
         const USUARIO_ADMIN = 'admin';
         const SENHA_ADMIN = 'dsouza2026';
+        let expandirCaixaDashboard = false;
+        let expandirHistoricoDashboard = false;
 
         function entrarAdmin() {
             const usuario = document.getElementById('loginUser').value.trim();
@@ -1284,9 +1322,22 @@
             }
         }
 
+        function alternarVerMaisCaixa() {
+            expandirCaixaDashboard = !expandirCaixaDashboard;
+            atualizarTelaCaixa();
+        }
+
+        function alternarVerMaisHistorico() {
+            expandirHistoricoDashboard = !expandirHistoricoDashboard;
+            renderizarHistoricoDiario();
+        }
+
         function atualizarTelaCaixa() {
             let corpoTabela = document.getElementById('tabelaCaixa');
             let corpoTabelaDetalhada = document.getElementById('tabelaCaixaDetalhada');
+            let containerBtn = document.getElementById('containerBtnVerMais');
+            let btnVerMais = document.getElementById('btnVerMaisCaixa');
+            
             corpoTabela.innerHTML = '';
             corpoTabelaDetalhada.innerHTML = '';
 
@@ -1296,17 +1347,21 @@
             if (bancoDeCaixa.length === 0) {
                 corpoTabela.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#7f8c8d;">Nenhuma movimentação registrada.</td></tr>';
                 corpoTabelaDetalhada.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#7f8c8d;">Nenhuma movimentação registrada.</td></tr>';
+                if (containerBtn) containerBtn.style.display = 'none';
             }
 
             const listaInvertida = [...bancoDeCaixa].reverse();
-            listaInvertida.forEach(function(item) {
+
+            // Lógica para limitar a 2 itens no Dashboard se não estiver expandido
+            const listaDashboard = expandirCaixaDashboard ? listaInvertida : listaInvertida.slice(0, 2);
+
+            // Atualiza a tabela resumida do Dashboard (com limite de 2 itens)
+            listaDashboard.forEach(function(item) {
                 let icone = item.tipo === 'entrada'
                     ? '<i class="fas fa-arrow-up" style="color:#2ecc71"></i> Entrada'
                     : '<i class="fas fa-arrow-down" style="color:#e74c3c"></i> Saída';
                 let corStatus = item.tipo === 'entrada' ? 'status-pago' : 'status-pendente';
                 let textoStatus = item.tipo === 'entrada' ? 'Recebido' : 'Pago';
-
-                if (item.tipo === 'entrada') { totalEntradas += item.valor; } else { totalSaidas += item.valor; }
                 let valorBRL = item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
                 let colunaAcao = `<td class="mobile-action-cell"><button class="btn-apagar-linha" onclick="deletarItemCaixa('${item.id}')" title="Apagar lançamento"><i class="fas fa-trash-alt"></i> Apagar registro</button></td>`;
@@ -1321,8 +1376,45 @@
                 </tr>`;
                 
                 corpoTabela.innerHTML += linha;
+            });
+
+            // Atualiza a tabela completa da aba Fluxo de Caixa (mostra tudo)
+            listaInvertida.forEach(function(item) {
+                if (item.tipo === 'entrada') { totalEntradas += item.valor; } else { totalSaidas += item.valor; }
+                let icone = item.tipo === 'entrada'
+                    ? '<i class="fas fa-arrow-up" style="color:#2ecc71"></i> Entrada'
+                    : '<i class="fas fa-arrow-down" style="color:#e74c3c"></i> Saída';
+                let corStatus = item.tipo === 'entrada' ? 'status-pago' : 'status-pendente';
+                let textoStatus = item.tipo === 'entrada' ? 'Recebido' : 'Pago';
+                let valorBRL = item.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+                let colunaAcao = `<td class="mobile-action-cell"><button class="btn-apagar-linha" onclick="deletarItemCaixa('${item.id}')" title="Apagar lançamento"><i class="fas fa-trash-alt"></i> Apagar registro</button></td>`;
+
+                let linha = `<tr>
+                    <td data-label="Data">${item.data}</td>
+                    <td data-label="Tipo">${icone}</td>
+                    <td data-label="Descrição">${item.descricao}</td>
+                    <td data-label="Valor">${valorBRL}</td>
+                    <td data-label="Status"><span class="status ${corStatus}">${textoStatus}</span></td>
+                    ${colunaAcao}
+                </tr>`;
+                
                 corpoTabelaDetalhada.innerHTML += linha;
             });
+
+            // Controle de visibilidade e texto do botão Ver Mais
+            if (containerBtn && btnVerMais) {
+                if (listaInvertida.length > 2) {
+                    containerBtn.style.display = 'flex';
+                    if (expandirCaixaDashboard) {
+                        btnVerMais.innerHTML = '<i class="fas fa-chevron-up"></i> Ver menos';
+                    } else {
+                        btnVerMais.innerHTML = '<i class="fas fa-chevron-down"></i> Ver mais';
+                    }
+                } else {
+                    containerBtn.style.display = 'none';
+                }
+            }
 
             let balancoReal = totalEntradas - totalSaidas;
             document.getElementById('valorEntradas').innerText = totalEntradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1342,6 +1434,8 @@
 
         function renderizarHistoricoDiario() {
             const container = document.getElementById('historicoDiario');
+            const containerBtn = document.getElementById('containerBtnVerMaisHistorico');
+            const btnVerMais = document.getElementById('btnVerMaisHistorico');
             const agrupado = {};
 
             bancoDeAgendamentos.forEach(function(item) {
@@ -1360,16 +1454,20 @@
                 agrupado[chave].caixa.push(item);
             });
 
-            const dias = Object.values(agrupado).sort(function(a, b) {
+            const todosOsDias = Object.values(agrupado).sort(function(a, b) {
                 return a.dataChave.localeCompare(b.dataChave);
             }).reverse();
 
-            if (dias.length === 0) {
+            if (todosOsDias.length === 0) {
                 container.innerHTML = '<div class="history-item">Nenhum registro encontrado.</div>';
+                if (containerBtn) containerBtn.style.display = 'none';
                 return;
             }
 
-            container.innerHTML = dias.map(function(dia) {
+            // Aplica o limite de 2 dias se não estiver expandido
+            const diasExibidos = expandirHistoricoDashboard ? todosOsDias : todosOsDias.slice(0, 2);
+
+            container.innerHTML = diasExibidos.map(function(dia) {
                 const totalCaixa = dia.caixa.reduce(function(total, item) { return total + item.valor; }, 0);
                 const entradas = dia.caixa.filter(function(item) { return item.tipo === 'entrada'; }).reduce(function(total, item) { return total + item.valor; }, 0);
                 const saidas = dia.caixa.filter(function(item) { return item.tipo === 'saida'; }).reduce(function(total, item) { return total + item.valor; }, 0);
@@ -1392,6 +1490,20 @@
                     </div>
                 `;
             }).join('');
+
+            // Controle de visibilidade do botão Ver Mais no Histórico por Dia
+            if (containerBtn && btnVerMais) {
+                if (todosOsDias.length > 2) {
+                    containerBtn.style.display = 'flex';
+                    if (expandirHistoricoDashboard) {
+                        btnVerMais.innerHTML = '<i class="fas fa-chevron-up"></i> Ver menos';
+                    } else {
+                        btnVerMais.innerHTML = '<i class="fas fa-chevron-down"></i> Ver mais';
+                    }
+                } else {
+                    containerBtn.style.display = 'none';
+                }
+            }
         }
 
         let mesCalendarioAtual = new Date();
